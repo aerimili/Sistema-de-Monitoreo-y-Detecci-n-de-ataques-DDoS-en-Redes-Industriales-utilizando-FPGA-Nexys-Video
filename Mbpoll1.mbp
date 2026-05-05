@@ -3,8 +3,8 @@
    <FileSchema r="0" c="1"/>
    <Version major="13" minor="2" patch="0" build="2547"/>
    <dpi>96</dpi>
-   <WP left="0" right="758" top="0" bottom="422" ShowCmd="1" MaxPosX="-1" MaxPosY="-1" MinPosX="-1" MinPosY="-1"/>
-   <ScanRate>1000</ScanRate>
+   <WP left="0" right="1020" top="0" bottom="505" ShowCmd="1" MaxPosX="-1" MaxPosY="-1" MinPosX="-1" MinPosY="-1"/>
+   <ScanRate>1</ScanRate>
    <SlaveID>1</SlaveID>
    <Enable>1</Enable>
    <StopOnError>0</StopOnError>
@@ -69,13 +69,40 @@
    <Data>
       <Function>3</Function>
       <Address>0</Address>
-      <Quantity>1</Quantity>
+      <Quantity>10</Quantity>
       <EnronMode>0</EnronMode>
       <Formats>
-         <F f="0" v="26"/>
+         <F f="0" v="21"/>
+         <F f="0" v="0"/>
+         <F f="0" v="0"/>
+         <F f="0" v="0"/>
+         <F f="0" v="0"/>
+         <F f="0" v="0"/>
+         <F f="0" v="0"/>
+         <F f="0" v="0"/>
+         <F f="0" v="0"/>
+         <F f="0" v="0"/>
       </Formats>
       <Bytes>
-         <B>26</B>
+         <B>21</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
+         <B>0</B>
          <B>0</B>
       </Bytes>
       <CellData/>
