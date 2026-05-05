@@ -84,7 +84,7 @@ def preprocesador():
           conexionFPGA(c1, c2, c3, modo = "D")
 
           with open("datos_normales.csv", "a") as f:
-            f.write(f"{c1},{c2},{c3}\n")
+            f.write(f"{time.time()},{c1},{c2},{c3}\n")
         
 
         ventana_ip = []
