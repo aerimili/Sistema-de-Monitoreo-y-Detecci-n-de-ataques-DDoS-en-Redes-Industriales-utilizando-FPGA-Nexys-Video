@@ -7,7 +7,7 @@ import serial
 import json
 
 interface = 'Ethernet'
-filter = 'tcp port 502'
+filter = 'tcp port 502 or icmp or udp'
 
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
@@ -83,7 +83,7 @@ def preprocesador():
 
           conexionFPGA(c1, c2, c3, modo = "D")
 
-          with open("datos_normales.csv", "a") as f:
+          with open("datos_ataqueUDP.csv", "a") as f:
             f.write(f"{time.time()},{c1},{c2},{c3}\n")
         
 

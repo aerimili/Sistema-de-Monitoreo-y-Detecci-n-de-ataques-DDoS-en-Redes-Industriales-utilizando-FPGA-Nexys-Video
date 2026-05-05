@@ -7,20 +7,23 @@ t0 = data["t"][0]
 data["t"] = data["t"] - t0
 
 plt.figure()
-plt.plot(data["t"], data["C1"], label="C1 [pps]")
-plt.plot(data["t"], data["C2"], label="C2")
-plt.plot(data["t"], data["C3"], label="C3")
-
+plt.plot(data["t"], data["C1"])
 plt.xlabel("Tiempo [s]")
-plt.ylabel("Valor")
-plt.legend()
+plt.ylabel("Tasa de paquetes [pps]")
 plt.grid()
+
+plt.figure()
+plt.plot(data["t"], data["C2"])
+plt.xlabel("Tiempo [s]")
+plt.ylabel("Índice de variación de IPs")
+plt.grid()
+
+plt.figure()
+plt.plot(data["t"], data["C3"])
+plt.xlabel("Tiempo [s]")
+plt.ylabel("Entropía")
+plt.grid()
+
 plt.show()
 
 
-import seaborn as sns
-
-data["estado"] = ["normal" if t < 60 else "ataque" for t in data["t"]]
-
-sns.boxplot(x="estado", y="C1", data=data)
-plt.show()

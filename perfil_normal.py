@@ -4,9 +4,9 @@ import json
 
 data = np.loadtxt("datos_normales.csv", delimiter=",")
 
-C1n = int(np.mean(data[:,0]))
-C2n = int(np.mean(data[:,1]))
-C3n = int(np.mean(data[:,2]))
+C1n = int(np.mean(data[:,1]))
+C2n = int(np.mean(data[:,2]))
+C3n = int(np.mean(data[:,3]))
 
 std = np.std(data, axis=0)
 
