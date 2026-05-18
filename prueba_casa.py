@@ -2,47 +2,50 @@ import time
 import random
 import serial
 
-# =========================
-# CONFIGURACIÓN UART
-# =========================
+
 ser = serial.Serial('COM3', 9600, timeout=1)
 
-# =========================
-# FUNCIÓN DE ENVÍO
-# =========================
-def enviarFPGA(c1, c2, c3, modo="D", th=None):
+
+def enviar_valor(modo, id, valor):
+    msg = f"{modo}{id}{int(valor)}\n"
+    ser.write(msg.encode("ascii"))
+    print(f"Enviando a FPGA: {msg.strip()}")
+
+def enviarFPGA(c1, c2, c3, modo="D"):
+    
     if modo == "N":
-        data = f"N,{c1},{c2},{c3},{th}\n"
+        print("Enviando perfil normal")
     else:
-        data = f"D,{c1},{c2},{c3}\n"
+        print("Enviando datos")
 
-    ser.write(data.encode())
+    enviar_valor(modo, "A", c1)
+    time.sleep(0.01)
 
-    # DEBUG IMPORTANTE
-    print(f"[TX] {data.strip()}")
-    print(f"[BYTES] {data.encode()}")
+    enviar_valor(modo, "B", c2)
+    time.sleep(0.01)
+
+    enviar_valor(modo, "C", c3)
+    time.sleep(0.01)
+
     print("-" * 30)
-
 
 # =========================
 # PERFIL NORMAL
 # =========================
-C1n = 7
-C2n = 28
-C3n = 92
-th  = 879
+C1n = 49
+C2n = 3
+C3n = 97
+
 
 time.sleep(2)
 
 # Enviar perfil
-enviarFPGA(C1n, C2n, C3n, modo="N", th=th)
+enviarFPGA(C1n, C2n, C3n, modo="N")
 
 print("Perfil enviado correctamente\n")
 
 
-# =========================
-# LOOP PRINCIPAL
-# =========================
+
 ultimo_ataque = time.time()
 
 while True:
@@ -50,21 +53,21 @@ while True:
     tiempo_actual = time.time()
 
     # ATAQUE cada 5s
-    if tiempo_actual - ultimo_ataque >= 5:
+#    if tiempo_actual - ultimo_ataque >= 5:
 
-        print("🚨 ATAQUE SIMULADO 🚨")
+#        print("🚨 ATAQUE SIMULADO 🚨")
 
-        c1 = random.randint(200, 500)
-        c2 = random.randint(50, 100)
-        c3 = random.randint(200, 400)
+#        c1 = random.randint(300, 800)
+#        c2 = random.randint(80, 90)
+#        c3 = random.randint(700, 900)
 
-        ultimo_ataque = tiempo_actual
+#        ultimo_ataque = tiempo_actual
 
-    else:
+#    else:
         # NORMAL
-        c1 = random.randint(5, 10)
-        c2 = random.randint(20, 30)
-        c3 = random.randint(80, 110)
+    c1 = random.randint(40, 60)
+    c2 = random.randint(1, 5)
+    c3 = random.randint(80, 100)
 
     print(f"Vector generado: {[c1, c2, c3]}")
 
