@@ -26,9 +26,12 @@ C3n = perfil_normal["C3n"]
 print("Perfil cargado:", C1n, C2n, C3n)
 
 
-def enviar_valor(modo, id, valor):
-    msg = f"{modo}{id}{int(valor)}\n"   
+def enviar_valor(modo, identificador, valor):
+
+    msg = f"{modo}{identificador}{int(valor)}\n"
+
     ser.write(msg.encode('ascii'))
+
     print(f"[TX] {msg.strip()}")
 
 
@@ -39,20 +42,20 @@ def conexionFPGA(c1, c2, c3, modo="D"):
     else:
         print("Enviando datos")
 
-    enviar_valor("A", c1)
+    enviar_valor(modo, "A", c1)
     time.sleep(0.01)  
 
-    enviar_valor("B", c2)
+    enviar_valor(modo, "B", c2)
     time.sleep(0.01)
 
-    enviar_valor("C", c3)
+    enviar_valor(modo, "C", c3)
     time.sleep(0.01)
 
 
 time.sleep(2)
 conexionFPGA(C1n, C2n, C3n, modo="N")
 
-
+ 
 def entropia(lista_ip):
     if not lista_ip:
         return 0
@@ -111,8 +114,8 @@ def preprocesador():
                     conexionFPGA(c1, c2, c3, modo="D")
 
                     
-                    #with open("datos_ataqueTCPSYN.csv", "a") as f:
-                    #    f.write(f"{time.time()},{c1},{c2},{c3}\n")
+                    with open("datos_ataqueTCPSYN.csv", "a") as f:
+                        f.write(f"{time.time()},{c1},{c2},{c3}\n")
 
                 ventana_ip = []
                 inicio_ventana = tiempo_actual

@@ -5,6 +5,7 @@ import collections
 import asyncio
 import serial
 import json
+import threading
 
 
 interface = 'Ethernet'
@@ -15,21 +16,7 @@ asyncio.set_event_loop(loop)
 
 ser = serial.Serial('COM4', 9600, timeout=0.1)
 
-ser.reset_input_buffer()
-ser.reset_output_buffer()
 
-# =========================
-# métricas
-# =========================
-TP = 0
-FP = 0
-FN = 0
-
-latencias = []
-
-# =========================
-# cargar perfil normal
-# =========================
 with open("perfil_normal.json", "r") as i:
     perfil_normal = json.load(i)
 
@@ -40,12 +27,12 @@ C3n = perfil_normal["C3n"]
 print("Perfil cargado:", C1n, C2n, C3n)
 
 
-# =========================
-# UART FPGA
-# =========================
-def enviar_valor(modo, ident, valor):
-    msg = f"{modo}{ident}{int(valor)}\n"
+def enviar_valor(modo, identificador, valor):
+
+    msg = f"{modo}{identificador}{int(valor)}\n"
+
     ser.write(msg.encode('ascii'))
+
     print(f"[TX] {msg.strip()}")
 
 
@@ -66,40 +53,54 @@ def conexionFPGA(c1, c2, c3, modo="D"):
     time.sleep(0.01)
 
 
-# =========================
-# leer FPGA
-# =========================
-def revisar_mensaje():
+# ==========================
+# Escuchar mensajes de FPGA
+# ==========================
+def escuchar_fpga():
 
-    while ser.in_waiting:
+    buffer = ""
 
-        raw = ser.readline()
+    while True:
 
-        msg = raw.decode(
-            errors="ignore"
-        ).strip()
+        try:
+            if ser.in_waiting > 0:
 
-        if msg:
-            print("[FPGA]", msg)
+                dato = ser.read(
+                    ser.in_waiting
+                ).decode(
+                    "ascii",
+                    errors="ignore"
+                )
 
-            if msg == "ALERTA_DDOS":
-                return True
+                buffer += dato
 
-    return False
+                while "\n" in buffer:
+
+                    linea, buffer = buffer.split("\n", 1)
+
+                    linea = linea.strip()
+
+                    if linea:
+                        print(f"[RX FPGA] {linea}")
+
+            time.sleep(0.05)
+
+        except Exception as e:
+            print("Error leyendo FPGA:", e)
+            time.sleep(1)
 
 
-# =========================
-# entropía
-# =========================
+time.sleep(2)
+conexionFPGA(C1n, C2n, C3n, modo="N")
+
+
 def entropia(lista_ip):
 
     if not lista_ip:
         return 0
 
     conteo = collections.Counter(lista_ip)
-
     total = len(lista_ip)
-
     ent = 0
 
     for ip in conteo:
@@ -109,28 +110,7 @@ def entropia(lista_ip):
     return ent
 
 
-# =========================
-# enviar perfil normal
-# =========================
-time.sleep(2)
-
-conexionFPGA(
-    C1n,
-    C2n,
-    C3n,
-    modo="N"
-)
-
-
-# =========================
-# captura
-# =========================
 def preprocesador():
-
-    global TP
-    global FP
-    global FN
-    global latencias
 
     print(f"Iniciando captura en {interface}...")
 
@@ -141,7 +121,6 @@ def preprocesador():
     )
 
     ventana_ip = []
-
     inicio_ventana = time.time()
 
     try:
@@ -156,7 +135,7 @@ def preprocesador():
             except AttributeError:
                 continue
 
-            # cada 1 segundo
+            # Cada 1 segundo
             if tiempo_actual - inicio_ventana >= 1.0:
 
                 total_paquetes = len(ventana_ip)
@@ -164,113 +143,48 @@ def preprocesador():
                 if total_paquetes > 0:
 
                     c1 = total_paquetes
-
                     ip_unicas = len(set(ventana_ip))
-
-                    c2 = int(
-                        (ip_unicas / total_paquetes) * 100
-                    )
-
-                    c3 = int(
-                        entropia(ventana_ip) * 100
-                    )
+                    c2 = int((ip_unicas / total_paquetes) * 100)
+                    c3 = int(entropia(ventana_ip) * 100)
 
                     print(
-                        f"[vector] "
-                        f"C1={c1} "
-                        f"C2={c2} "
-                        f"C3={c3}"
+                        f"[vector] C1={c1}, C2={c2}, C3={c3}"
                     )
-
-                    # =====================
-                    # enviar vector
-                    # =====================
-                    t0 = time.time()
 
                     conexionFPGA(
                         c1,
                         c2,
-                        c3
+                        c3,
+                        modo="D"
                     )
 
-                    alerta = revisar_mensaje()
+                    with open(
+                        "datos_ataqueTCPSYN.csv",
+                        "a"
+                    ) as f:
 
-                    # =====================
-                    # lógica detección
-                    # =====================
-                    ataque_real = (
-                        c1 > C1n * 2
-                    )
-
-                    if alerta:
-
-                        lat_ms = (
-                            time.time() - t0
-                        ) * 1000
-
-                        latencias.append(lat_ms)
-
-                        print(
-                            f"Latencia: "
-                            f"{lat_ms:.2f} ms"
+                        f.write(
+                            f"{time.time()},"
+                            f"{c1},"
+                            f"{c2},"
+                            f"{c3}\n"
                         )
-
-                        if ataque_real:
-                            TP += 1
-                        else:
-                            FP += 1
-
-                    else:
-
-                        if ataque_real:
-                            FN += 1
-
-                    # =====================
-                    # métricas
-                    # =====================
-                    precision = 0
-
-                    if TP + FP > 0:
-                        precision = (
-                            TP / (TP + FP)
-                        ) * 100
-
-                    fnr = 0
-
-                    if TP + FN > 0:
-                        fnr = (
-                            FN / (TP + FN)
-                        ) * 100
-
-                    lat_prom = 0
-
-                    if latencias:
-                        lat_prom = (
-                            sum(latencias)
-                            / len(latencias)
-                        )
-
-                    print(
-                        f"Precision: "
-                        f"{precision:.2f}%"
-                    )
-
-                    print(
-                        f"Falsos negativos: "
-                        f"{fnr:.2f}%"
-                    )
-
-                    print(
-                        f"Latencia promedio: "
-                        f"{lat_prom:.2f} ms"
-                    )
 
                 ventana_ip = []
-
                 inicio_ventana = tiempo_actual
 
     except KeyboardInterrupt:
         print("Captura detenida")
 
 
-preprocesador()
+if __name__ == "__main__":
+
+    # iniciar recepción UART
+    hilo_rx = threading.Thread(
+        target=escuchar_fpga,
+        daemon=True
+    )
+
+    hilo_rx.start()
+
+    preprocesador()
