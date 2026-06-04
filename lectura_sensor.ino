@@ -65,12 +65,8 @@ void loop() {
         (int)(temperatura * 10)
       );
 
-      Serial.print("  Temp: ");
-      Serial.print(temperatura, 2);
-
-      Serial.println(" °C");
-
-      delay(100);
+      delay(10);
+      
     }
 
     Serial.println("Cliente desconectado");
