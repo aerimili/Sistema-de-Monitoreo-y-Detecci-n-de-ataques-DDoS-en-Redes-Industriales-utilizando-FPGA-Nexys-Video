@@ -14,7 +14,7 @@ filter = 'tcp port 502'
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
-ser = serial.Serial('COM4', 9600, timeout=0.1)
+ser = serial.Serial('COM8', 9600, timeout=0.1)
 
 
 with open("perfil_normal.json", "r") as i:
@@ -53,9 +53,6 @@ def conexionFPGA(c1, c2, c3, modo="D"):
     time.sleep(0.01)
 
 
-# ==========================
-# Escuchar mensajes de FPGA
-# ==========================
 def escuchar_fpga():
 
     buffer = ""
@@ -159,7 +156,7 @@ def preprocesador():
                     )
 
                     with open(
-                        "datos_ataqueTCPSYN.csv",
+                        "datos_normales.csv",
                         "a"
                     ) as f:
 
