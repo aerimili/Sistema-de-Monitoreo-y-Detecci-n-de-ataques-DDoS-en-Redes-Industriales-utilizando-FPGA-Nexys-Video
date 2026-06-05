@@ -14,7 +14,7 @@ filter = 'tcp port 502'
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
-ser = serial.Serial('COM8', 9600, timeout=0.1)
+ser = serial.Serial('COM4', 9600, timeout=0.1)
 
 
 with open("perfil_normal.json", "r") as i:
@@ -23,8 +23,9 @@ with open("perfil_normal.json", "r") as i:
 C1n = perfil_normal["C1n"]
 C2n = perfil_normal["C2n"]
 C3n = perfil_normal["C3n"]
+th = perfil_normal["th"]
 
-print("Perfil cargado:", C1n, C2n, C3n)
+print("Perfil cargado:", C1n, C2n, C3n, th)
 
 
 def enviar_valor(modo, identificador, valor):
@@ -36,21 +37,20 @@ def enviar_valor(modo, identificador, valor):
     print(f"[TX] {msg.strip()}")
 
 
-def conexionFPGA(c1, c2, c3, modo="D"):
+def conexionFPGA(c1, c2, c3, modo="D", th=None):
 
     if modo == "N":
         print("Enviando perfil normal")
+        if th is not None:
+            enviar_valor("N", "T", th)
     else:
         print("Enviando datos")
 
     enviar_valor(modo, "A", c1)
-    time.sleep(0.01)
 
     enviar_valor(modo, "B", c2)
-    time.sleep(0.01)
 
     enviar_valor(modo, "C", c3)
-    time.sleep(0.01)
 
 
 def escuchar_fpga():
@@ -88,7 +88,7 @@ def escuchar_fpga():
 
 
 time.sleep(2)
-conexionFPGA(C1n, C2n, C3n, modo="N")
+conexionFPGA(C1n, C2n, C3n, modo="N", th=th)
 
 
 def entropia(lista_ip):
@@ -148,13 +148,9 @@ def preprocesador():
                         f"[vector] C1={c1}, C2={c2}, C3={c3}"
                     )
 
-                    conexionFPGA(
-                        c1,
-                        c2,
-                        c3,
-                        modo="D"
-                    )
-
+                    conexionFPGA(c1,c2,c3, modo="D")
+                    
+                    """
                     with open(
                         "datos_normales.csv",
                         "a"
@@ -166,7 +162,7 @@ def preprocesador():
                             f"{c2},"
                             f"{c3}\n"
                         )
-
+                    """
                 ventana_ip = []
                 inicio_ventana = tiempo_actual
 

@@ -9,7 +9,7 @@ import threading
 interface = 'Ethernet'
 filter = 'tcp port 502'
 
-ser = serial.Serial('COM8', 9600, timeout=0.1)
+ser = serial.Serial('COM4', 9600, timeout=0.1)
 
 buffer_ips = []
 lock_buffer = threading.Lock()
@@ -29,8 +29,9 @@ with open("perfil_normal.json", "r") as i:
 C1n = perfil_normal["C1n"]
 C2n = perfil_normal["C2n"]
 C3n = perfil_normal["C3n"]
+th = perfil_normal["th"]
 
-print("Perfil cargado:", C1n, C2n, C3n)
+print("Perfil cargado:", C1n, C2n, C3n, th)
 
 
 def guardar_reporte():
@@ -52,9 +53,11 @@ def enviar_valor(modo, identificador, valor):
     print(f"[TX] {msg.strip()}")
 
 
-def conexionFPGA(c1, c2, c3, modo="D"):
+def conexionFPGA(c1, c2, c3, modo="D", th=None):
     if modo == "N":
         print("Enviando perfil normal")
+        if th is not None:
+            enviar_valor("N", "T", th)
     else:
         print("Enviando datos")
 
@@ -201,7 +204,7 @@ def controlador_manual():
 if __name__ == "__main__":
 
     time.sleep(1)
-    conexionFPGA(C1n, C2n, C3n, modo="N")
+    conexionFPGA(C1n, C2n, C3n, modo="N", th=th)
     print("Perfil normal cargado en FPGA")
     time.sleep(2)
 
