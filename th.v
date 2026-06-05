@@ -20,15 +20,12 @@ module th_calculator(
 
 parameter MARGEN = 20;
 
-// registrar NaHiD para usar valor estable
 reg [15:0] nahid_reg = 0;
 
 always @(posedge clk) begin
 
-    // guardar siempre último NaHiD
     nahid_reg <= valor_nahid;
 
-    // reset entrenamiento
     if (reset_training) begin
 
         acumulado <= 0;
@@ -40,13 +37,10 @@ always @(posedge clk) begin
         listo     <= 0;
     end
 
-    // nuevo vector
     else if (vector_listo && !listo) begin
 
-        // sumar valor estable
         acumulado <= acumulado + nahid_reg;
 
-        // si es muestra 16
         if (contador == 1023) begin
 
             promedio <= (acumulado + nahid_reg) >> 10;
@@ -59,7 +53,6 @@ always @(posedge clk) begin
             listo <= 1;
         end
 
-        // incrementar contador
         contador <= contador + 1;
     end
 end
