@@ -6,7 +6,7 @@ import asyncio
 import serial
 import json
 import threading
-
+import os
 
 interface = 'Ethernet'
 filter = 'tcp port 502'
@@ -15,7 +15,6 @@ loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
 ser = serial.Serial('COM4', 9600, timeout=0.1)
-
 
 with open("perfil_normal.json", "r") as i:
     perfil_normal = json.load(i)
@@ -29,56 +28,52 @@ print("Perfil cargado:", C1n, C2n, C3n, th)
 
 
 def enviar_valor(modo, identificador, valor):
-
     msg = f"{modo}{identificador}{int(valor)}\n"
-
     ser.write(msg.encode('ascii'))
-
     print(f"[TX] {msg.strip()}")
 
 
 def conexionFPGA(c1, c2, c3, modo="D", th=None):
-
     if modo == "N":
         print("Enviando perfil normal")
         if th is not None:
-            enviar_valor("N", "T", th)
+            enviar_valor(modo, "T", th)
     else:
         print("Enviando datos")
 
     enviar_valor(modo, "A", c1)
-
     enviar_valor(modo, "B", c2)
-
     enviar_valor(modo, "C", c3)
 
 
 def escuchar_fpga():
-
     buffer = ""
+    archivo_historial = "historial_ataques.csv"
+    
+    if not os.path.exists(archivo_historial):
+        with open(archivo_historial, "w") as f:
+            f.write("Timestamp_Epoch,Fecha_Hora,Mensaje\n")
 
     while True:
-
         try:
             if ser.in_waiting > 0:
+                
+                t_llegada = time.time()
+                fecha_hora = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(t_llegada))
 
-                dato = ser.read(
-                    ser.in_waiting
-                ).decode(
-                    "ascii",
-                    errors="ignore"
-                )
-
+                dato = ser.read(ser.in_waiting).decode("ascii", errors="ignore")
                 buffer += dato
 
                 while "\n" in buffer:
-
                     linea, buffer = buffer.split("\n", 1)
-
                     linea = linea.strip()
 
                     if linea:
                         print(f"[RX FPGA] {linea}")
+                        
+                        if linea == "ALERTA_DDOS":
+                            with open(archivo_historial, "a") as f:
+                                f.write(f"{t_llegada:.2f},{fecha_hora},{linea}\n")
 
             time.sleep(0.05)
 
@@ -92,7 +87,6 @@ conexionFPGA(C1n, C2n, C3n, modo="N", th=th)
 
 
 def entropia(lista_ip):
-
     if not lista_ip:
         return 0
 
@@ -108,61 +102,36 @@ def entropia(lista_ip):
 
 
 def preprocesador():
-
     print(f"Iniciando captura en {interface}...")
 
-    capture = pyshark.LiveCapture(
-        interface=interface,
-        bpf_filter=filter,
-        tshark_path=r"D:\Program Files (x86)\Wireshark\tshark.exe"
-    )
+    capture = pyshark.LiveCapture(interface=interface,bpf_filter=filter,tshark_path=r"D:\Program Files (x86)\Wireshark\tshark.exe")
 
     ventana_ip = []
     inicio_ventana = time.time()
 
     try:
         for paquete in capture.sniff_continuously():
-
             tiempo_actual = time.time()
 
             try:
                 src_ip = paquete.ip.src
                 ventana_ip.append(src_ip)
-
             except AttributeError:
                 continue
 
-            # Cada 1 segundo
             if tiempo_actual - inicio_ventana >= 1.0:
-
                 total_paquetes = len(ventana_ip)
 
                 if total_paquetes > 0:
-
                     c1 = total_paquetes
                     ip_unicas = len(set(ventana_ip))
                     c2 = int((ip_unicas / total_paquetes) * 100)
                     c3 = int(entropia(ventana_ip) * 100)
 
-                    print(
-                        f"[vector] C1={c1}, C2={c2}, C3={c3}"
-                    )
+                    print(f"[vector] C1={c1}, C2={c2}, C3={c3}")
 
-                    conexionFPGA(c1,c2,c3, modo="D")
-                    
-                    """
-                    with open(
-                        "datos_normales.csv",
-                        "a"
-                    ) as f:
+                    conexionFPGA(c1, c2, c3, modo="D")
 
-                        f.write(
-                            f"{time.time()},"
-                            f"{c1},"
-                            f"{c2},"
-                            f"{c3}\n"
-                        )
-                    """
                 ventana_ip = []
                 inicio_ventana = tiempo_actual
 
@@ -172,12 +141,7 @@ def preprocesador():
 
 if __name__ == "__main__":
 
-    # iniciar recepción UART
-    hilo_rx = threading.Thread(
-        target=escuchar_fpga,
-        daemon=True
-    )
-
+    hilo_rx = threading.Thread(target=escuchar_fpga,daemon=True)
     hilo_rx.start()
 
     preprocesador()

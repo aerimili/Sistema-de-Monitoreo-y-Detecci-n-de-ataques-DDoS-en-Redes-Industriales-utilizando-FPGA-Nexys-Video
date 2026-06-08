@@ -3,43 +3,97 @@ import random
 import serial
 import threading
 import collections
+import math
+import os
+
+interface = 'Ethernet'
+filter = 'tcp port 502'
 
 # Configuración del puerto COM
 ser = serial.Serial("COM3", 9600, timeout=0.1)
 ser.reset_input_buffer()
 ser.reset_output_buffer()
 
-# Hilo seguro para almacenar "paquetes simulados" (direcciones IP de origen)
 buffer_paquetes = []
 lock_buffer = threading.Lock()
 
+# Variables globales para métricas de evaluación
 ataque_activo = False
+t_evento = 0.0
+alerta_detectada_en_este_ataque = False
+
+TP = 0
+FP = 0
+FN = 0
+
+def imprimir_metricas():
+    precision = (TP / (TP + FP)) if (TP + FP) > 0 else 0.0
+    fnr = (FN / (FN + TP)) if (FN + TP) > 0 else 0.0
+    print(f" [MÉTRICAS] Precisión: {precision:.4f} | FNR: {fnr:.4f}")
 
 def enviar_valor(modo, identificador, valor):
     msg = f"{modo}{identificador}{int(valor)}\n"
     ser.write(msg.encode("ascii"))
 
-def conexionFPGA(c1, c2, c3, modo="D"):
+def conexionFPGA(c1, c2, c3, th=None, modo="D"):
     enviar_valor(modo, "A", c1)
+    time.sleep(0.01)
+    
     enviar_valor(modo, "B", c2)
+    time.sleep(0.01)
+    
     enviar_valor(modo, "C", c3)
+    time.sleep(0.01)
+    
+    if th is not None:
+        enviar_valor(modo, "T", th)
+        time.sleep(0.01)
 
 def escuchar_fpga():
+    global TP, FP, alerta_detectada_en_este_ataque
     buffer = ""
+    archivo_historial = "historial_ataques.csv"
+    
+    if not os.path.exists(archivo_historial):
+        with open(archivo_historial, "w") as f:
+            f.write("Timestamp_Epoch,Fecha_Hora,Mensaje,Latencia_Segundos\n")
+
     while True:
         try:
             if ser.in_waiting > 0:
+                t_llegada = time.time()
+                fecha_hora = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(t_llegada))
+
                 dato = ser.read(ser.in_waiting).decode("ascii", errors="ignore")
                 buffer += dato
                 while "\n" in buffer:
                     linea, buffer = buffer.split("\n", 1)
                     linea = linea.strip()
+                    
                     if linea:
-                        # Marcamos la alerta con un timestamp preciso para debuggear el desfase
-                        print(f"[{time.strftime('%H:%M:%S')}] [RX FPGA] >>> {linea} <<<")
+                        if linea == "ALERTA_DDOS":
+                            latencia = 0.0
+                            
+                            if ataque_activo:
+                                TP += 1
+                                if not alerta_detectada_en_este_ataque:
+                                    latencia = t_llegada - t_evento
+                                    alerta_detectada_en_este_ataque = True
+                                    print(f"{linea} (Verdadero Positivo)")
+                                    print(f"Latencia de detección: {latencia:.4f} s")
+                                else:
+                                    print(f"{linea} (Verdadero Positivo Continuo)")
+                            else:
+                                FP += 1
+                                print(f"{linea} (¡FALSO POSITIVO!)")
+                            
+                            imprimir_metricas()
+                            
+                            with open(archivo_historial, "a") as f:
+                                f.write(f"{t_llegada:.4f},{fecha_hora},{linea},{latencia:.4f}\n")
+                                
             time.sleep(0.01)
-        except Exception as e:
-            print("Error leyendo FPGA:", e)
+        except Exception:
             time.sleep(1)
 
 def entropia(lista_ip):
@@ -50,105 +104,75 @@ def entropia(lista_ip):
     ent = 0
     for ip in conteo:
         p = conteo[ip] / total
-        ent -= p * (p.__float__().as_integer_ratio()[1]) # Aproximación rápida para simulación
+        ent -= p * math.log2(p) 
     return ent
 
-# ==============================================================================
-# PROCESO 1: SIMULADOR DE TRÁFICO INDUSTRIAL (Generador de Eventos de Red)
-# ==============================================================================
 def generador_trafico_red():
     global ataque_activo
-    print("[HILO RED] Generador de tráfico iniciado...")
     
     while True:
         if ataque_activo:
-            # En DDoS entran MILES de paquetes por segundo de IPs aleatorias
-            # Simulamos ráfagas rápidas inyectando ruidos al buffer instantáneamente
             ip_atacante = f"192.168.40.{random.randint(100, 254)}"
             with lock_buffer:
                 buffer_paquetes.append(ip_atacante)
-            time.sleep(0.002) # Frecuencia masiva de ataque (500 paquetes/seg)
+            time.sleep(0.0015) 
         else:
-            # Tráfico Modbus legítimo: Determinista (1 petición/respuesta constante)
+            ip_normal = random.choice(["192.168.40.70", "192.168.40.20"])
             with lock_buffer:
-                buffer_paquetes.append("192.168.40.70") # PC Master Modbus fijo
-            time.sleep(0.05) # Frecuencia normal controlada
+                buffer_paquetes.append(ip_normal)
+            time.sleep(0.0074) 
 
-# ==============================================================================
-# PROCESO 2: PREPROCESADOR POR VENTANAS DE TIEMPO (Idéntico al código Real)
-# ==============================================================================
 def preprocesador_ventanas():
-    global ataque_activo
-    print("[HILO VENTANAS] Procesador de ventanas de 1s activo...")
-    
     inicio_ventana = time.time()
     
     while True:
         tiempo_actual = time.time()
         
-        # Monitoreo estricto del reloj del sistema (Ventana de 1 segundo absoluto)
         if tiempo_actual - inicio_ventana >= 1.0:
-            # Secuestramos el buffer actual de paquetes para procesarlo de forma aislada
             with lock_buffer:
                 ventana_actual = list(buffer_paquetes)
                 buffer_paquetes.clear()
             
-            inicio_ventana = tiempo_actual # Reiniciamos la ventana de inmediato
-            
+            inicio_ventana = tiempo_actual 
             total_paquetes = len(ventana_actual)
             
             if total_paquetes > 0:
                 c1 = total_paquetes
                 ip_unicas = len(set(ventana_actual))
                 
-                # Fórmulas exactas de tu informe de tesis
                 c2 = int((ip_unicas / total_paquetes) * 100)
                 c3 = int(entropia(ventana_actual) * 100)
                 
-                estado_str = "[ATAQUE]" if ataque_activo else "[NORMAL]"
-                print(f"\n[{time.strftime('%H:%M:%S')}] {estado_str} Ventana cerrada. {total_paquetes} paq procesados.")
-                print(f" -> Vectores calculados: C1={c1}, C2={c2}, C3={c3}")
-                
-                # Enviar directo a la FPGA sin interrupción
                 conexionFPGA(c1, c2, c3, modo="D")
-            else:
-                print(f"\n[{time.strftime('%H:%M:%S')}] Ventana vacía. Sin tráfico.")
+                
+        time.sleep(0.01) 
 
-        time.sleep(0.01) # Alivia la carga de la CPU en el bucle de reloj
-
-# ==============================================================================
-# PROCESO 3: ORQUESTADOR DEL ESCENARIO (Controlador del Ataque)
-# ==============================================================================
 def orquestador_escenario():
-    global ataque_activo
-    time.sleep(5) # Espera inicial
+    global ataque_activo, t_evento, alerta_detectada_en_este_ataque, FN
+    time.sleep(5) 
     
     while True:
-        # 10 segundos de calma normal
         ataque_activo = False
         time.sleep(10)
         
-        # 3 segundos de tormenta DDoS masiva
-        print("\n!!! GATILLANDO ATAQUE DDOS EN LA RED INDUSTRIAL SIMULADA !!!")
         ataque_activo = True
+        t_evento = time.time()
+        alerta_detectada_en_este_ataque = False
         time.sleep(3)
-        print("\n--- ATAQUE FINALIZADO. RETORNANDO RED A OPERACIÓN NORMAL ---")
+        
+        if not alerta_detectada_en_este_ataque:
+            FN += 1
+            print(f"\n[{time.strftime('%H:%M:%S')}] [!] El ataque finalizó sin respuesta de la FPGA -> Falso Negativo (FN)")
+            imprimir_metricas()
 
-# ==============================================================================
-# MAIN
-# ==============================================================================
 if __name__ == "__main__":
     time.sleep(1)
-    # Inicialización manual del perfil estático base (Modbus estable)
-    # Ponemos valores coherentes con la tasa de refresco del Modbus (20 paq/seg)
-    conexionFPGA(20, 5, 0, modo="N") 
-    print("Perfil de Calibración Normal inyectado. Iniciando entorno asíncrono...\n")
-    time.sleep(1)
+    
+    conexionFPGA(131, 1, 99, th=79, modo="N") 
+    time.sleep(2)
 
-    # Lanzamos los hilos independientes concurrentes
     threading.Thread(target=escuchar_fpga, daemon=True).start()
     threading.Thread(target=generador_trafico_red, daemon=True).start()
     threading.Thread(target=orquestador_escenario, daemon=True).start()
     
-    # El hilo principal ejecuta el despachador de ventanas de tiempo
     preprocesador_ventanas()
