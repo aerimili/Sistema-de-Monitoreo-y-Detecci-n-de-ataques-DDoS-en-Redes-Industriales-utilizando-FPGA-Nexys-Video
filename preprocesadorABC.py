@@ -9,7 +9,7 @@ import threading
 import os
 
 interface = 'Ethernet'
-filter = 'tcp port 502'
+filter = 'tcp port 502 or udp or icmp'
 
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
