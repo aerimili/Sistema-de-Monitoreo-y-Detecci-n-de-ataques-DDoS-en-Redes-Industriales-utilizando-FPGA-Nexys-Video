@@ -21,9 +21,11 @@ ip_maestro = "192.168.40.70"
 ip_esclavo = "192.168.40.20"  
 
 estado_ataque_real = False
-t_evento = 0.0
+t_evento = 0
 alerta_detectada_en_este_ataque = False
-ultimo_paquete_kali = 0.0
+ultimo_paquete_kali = 0
+ultimo_modbus = time.time()
+estado_modbus = 1
 
 TP = 0
 FP = 0
@@ -54,6 +56,13 @@ if not os.path.exists("historial_ataques.csv"):
     with open("historial_ataques.csv", "w") as f:
         f.write("Timestamp_Epoch,Fecha_Hora,TipoAtaque,Mensaje,Latencia_segundos\n")
 
+if not os.path.exists("conexion_modbus.csv"):
+    with open("conexion_modbus.csv", "w") as f:
+        f.write("Timestamp,Estado\n")
+
+if not os.path.exists("archivo_impacto.csv"):
+    with open("archivo_impacto.csv", "w") as f:
+        f.write("Timestamp,RTT,Ataque\n")
 
 def guardar_metricas():
     precision = (TP / (TP + FP)) if (TP + FP) > 0 else 0.0
@@ -133,13 +142,14 @@ def entropia(lista_ip):
     return ent
 
 def preprocesador():
-    global estado_ataque_real, t_evento, alerta_detectada_en_este_ataque, ultimo_paquete_kali, FN, ultima_alerta
+    global estado_ataque_real, t_evento, alerta_detectada_en_este_ataque, ultimo_paquete_kali, FN, ultima_alerta, ultimo_modbus, estado_modbus
     print(f"Iniciando captura en {interface}...")
 
     capture = pyshark.LiveCapture(interface=interface,bpf_filter=filter,tshark_path=r"D:\Program Files (x86)\Wireshark\tshark.exe")
     tiempo_ultimo_request = 0
     ventana_ip = []
     inicio_ventana = time.time()
+    ultimo_log_modbus = time.time()
 
     try:
         for paquete in capture.sniff_continuously():
@@ -173,6 +183,9 @@ def preprocesador():
                     tiempo_ultimo_request = float(paquete.sniff_timestamp)
 
                 elif src_ip == ip_esclavo and dst_ip == ip_maestro:
+                    ultimo_modbus = tiempo_actual
+                    estado_modbus = 1
+
                     if tiempo_ultimo_request > 0:
                         rtt = float(paquete.sniff_timestamp) - tiempo_ultimo_request
                         with open("archivo_impacto.csv", "a") as f:
@@ -186,6 +199,19 @@ def preprocesador():
                 ventana_ip.append(src_ip)
             except AttributeError:
                 pass
+            
+            if tiempo_actual - ultimo_modbus > 2:
+                estado_modbus = 0
+            else:
+                estado_modbus = 1
+
+            if tiempo_actual - ultimo_log_modbus >= 1:
+                with open("conexion_modbus.csv", "a") as f:
+                    f.write(f"{tiempo_actual:.4f},{estado_modbus}\n")
+
+                ultimo_log_modbus = tiempo_actual
+
+        
 
             if tiempo_actual - inicio_ventana >= 1.0:
                 total_paquetes = len(ventana_ip)
@@ -200,11 +226,13 @@ def preprocesador():
                     conexionFPGA(c1, c2, c3, modo="D")
 
                     estado = "ATAQUE" if estado_ataque_real else "NORMAL"
-
+                    
                     with open("vectores_capturados.csv", "a") as f:
                         f.write(f"{time.time()},"f"{estado},"f"{tipo_ataque if estado_ataque_real else 'NONE'},"f"{c1},"f"{c2},"f"{c3},"f"{ultima_alerta}\n")
 
+                    
                     ultima_alerta = 0    
+
                 ventana_ip = []
                 inicio_ventana = tiempo_actual
 
