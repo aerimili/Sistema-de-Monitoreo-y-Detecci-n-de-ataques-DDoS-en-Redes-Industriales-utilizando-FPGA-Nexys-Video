@@ -41,7 +41,7 @@ th = perfil_normal["th"]
 
 print(f"Perfil cargado: C1={C1n}, C2={C2n}, C3={C3n}, th={th}")
 
-tipo_ataque = "UDP_flood"
+tipo_ataque = "UDP_flood" #agregar según el ataque simulado (solo para guardar en archivos csv)
 ultima_alerta = 0
 
 if not os.path.exists("vectores_capturados.csv"):
@@ -55,10 +55,6 @@ if not os.path.exists("metricas.csv"):
 if not os.path.exists("historial_ataques.csv"):
     with open("historial_ataques.csv", "w") as f:
         f.write("Timestamp_Epoch,Fecha_Hora,TipoAtaque,Mensaje,Latencia_segundos\n")
-
-if not os.path.exists("conexion_modbus.csv"):
-    with open("conexion_modbus.csv", "w") as f:
-        f.write("Timestamp,Estado\n")
 
 if not os.path.exists("archivo_impacto.csv"):
     with open("archivo_impacto.csv", "w") as f:
@@ -86,8 +82,7 @@ def conexionFPGA(c1, c2, c3, modo="D", th=None):
     enviar_valor(modo, "C", c3)
 
 def escuchar_fpga():
-    global TP, FP, alerta_detectada_en_este_ataque
-    global ultima_alerta
+    global TP, FP, alerta_detectada_en_este_ataque, ultima_alerta
     buffer = ""
     
     while True:
@@ -103,13 +98,12 @@ def escuchar_fpga():
                     linea = linea.strip()
 
                     if linea:
-                        print(f"[RX FPGA] {linea}")
+                        print(f"FPGA: {linea}")
                         
                         if linea == "ALERTA_DDOS":
                             ultima_alerta = 1
                             latencia = 0.0
                             
-                            # Validamos contra el estado automático
                             if estado_ataque_real:
                                 TP += 1
                                 if not alerta_detectada_en_este_ataque:
@@ -126,6 +120,7 @@ def escuchar_fpga():
 
             time.sleep(0.05)
         except Exception as e:
+            print(f"Error en rx: {e}")
             time.sleep(1)
 
 time.sleep(2)
@@ -142,14 +137,13 @@ def entropia(lista_ip):
     return ent
 
 def preprocesador():
-    global estado_ataque_real, t_evento, alerta_detectada_en_este_ataque, ultimo_paquete_kali, FN, ultima_alerta, ultimo_modbus, estado_modbus
+    global estado_ataque_real, t_evento, alerta_detectada_en_este_ataque, ultimo_paquete_kali, FN, ultima_alerta
     print(f"Iniciando captura en {interface}...")
 
     capture = pyshark.LiveCapture(interface=interface,bpf_filter=filter,tshark_path=r"D:\Program Files (x86)\Wireshark\tshark.exe")
     tiempo_ultimo_request = 0
     ventana_ip = []
     inicio_ventana = time.time()
-    ultimo_log_modbus = time.time()
 
     try:
         for paquete in capture.sniff_continuously():
@@ -183,9 +177,6 @@ def preprocesador():
                     tiempo_ultimo_request = float(paquete.sniff_timestamp)
 
                 elif src_ip == ip_esclavo and dst_ip == ip_maestro:
-                    ultimo_modbus = tiempo_actual
-                    estado_modbus = 1
-
                     if tiempo_ultimo_request > 0:
                         rtt = float(paquete.sniff_timestamp) - tiempo_ultimo_request
                         with open("archivo_impacto.csv", "a") as f:
@@ -199,20 +190,7 @@ def preprocesador():
                 ventana_ip.append(src_ip)
             except AttributeError:
                 pass
-            
-            if tiempo_actual - ultimo_modbus > 2:
-                estado_modbus = 0
-            else:
-                estado_modbus = 1
-
-            if tiempo_actual - ultimo_log_modbus >= 1:
-                with open("conexion_modbus.csv", "a") as f:
-                    f.write(f"{tiempo_actual:.4f},{estado_modbus}\n")
-
-                ultimo_log_modbus = tiempo_actual
-
-        
-
+   
             if tiempo_actual - inicio_ventana >= 1.0:
                 total_paquetes = len(ventana_ip)
 
@@ -222,7 +200,7 @@ def preprocesador():
                     c2 = int((ip_unicas / total_paquetes) * 100)
                     c3 = int(entropia(ventana_ip) * 100)
 
-                    print(f"[vector] C1={c1}, C2={c2}, C3={c3}")
+                    print(f"Vector: C1={c1}, C2={c2}, C3={c3}")
                     conexionFPGA(c1, c2, c3, modo="D")
 
                     estado = "ATAQUE" if estado_ataque_real else "NORMAL"
@@ -237,7 +215,7 @@ def preprocesador():
                 inicio_ventana = tiempo_actual
 
     except KeyboardInterrupt:
-        print("\nCaptura detenida manualmente.")
+        print("\nFin captura.")
 
 if __name__ == "__main__":
     hilo_rx = threading.Thread(target=escuchar_fpga, daemon=True)
@@ -246,5 +224,5 @@ if __name__ == "__main__":
     try:
         preprocesador()
     except KeyboardInterrupt:
-        print("\n[SISTEMA] Cerrando proceso de forma segura.")
+        print("\nCerrando proceso.")
         guardar_metricas()
