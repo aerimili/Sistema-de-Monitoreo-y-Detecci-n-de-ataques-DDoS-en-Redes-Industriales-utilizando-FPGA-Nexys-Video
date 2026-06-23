@@ -19,11 +19,11 @@ fn_total = int(maximos_por_sesion["FN"].sum())
 precision_global = (tp_total / (tp_total + fp_total)) if (tp_total + fp_total) > 0 else 0.0
 fnr_global = (fn_total / (fn_total + tp_total)) if (fn_total + tp_total) > 0 else 0.0
 
-print(f"• Alertas válidas en latencia: {cantidad_ataques}")
-print(f"• Latencia promedio: {latencia_promedio:.6f} s")
+print(f"Alertas válidas en latencia: {cantidad_ataques}")
+print(f"Latencia promedio: {latencia_promedio:.6f} s")
 
-print(f"• Verdaderos Positivos Totales (TP): {tp_total}")
-print(f"• Falsos Positivos Totales (FP): {fp_total}")
-print(f"• Falsos Negativos Totales (FN): {fn_total}")
-print(f"• Precisión Global: {precision_global * 100:.2f} %")
-print(f"• Tasa de Falsos Negativos (FNR): {fnr_global * 100:.2f} %")
+print(f"TP: {tp_total}")
+print(f"FP: {fp_total}")
+print(f"FN: {fn_total}")
+print(f"Precisión: {precision_global * 100:.2f} %")
+print(f"FNR: {fnr_global * 100:.2f} %")

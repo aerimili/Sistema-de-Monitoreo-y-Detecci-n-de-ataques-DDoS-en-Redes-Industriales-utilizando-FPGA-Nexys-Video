@@ -20,7 +20,6 @@ datos = {
     "th": th
 }
 
-# Escribir al archivo JSON
 with open("perfil_normal.json", "w") as f:
     json.dump(datos, f, indent=4)
 
